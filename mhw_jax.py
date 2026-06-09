@@ -289,6 +289,7 @@ def run_production_io(p_obj, w0, n0, nframes, steps_per_frame, solver_name="leap
         dset_phi = f.create_dataset("potential", (num_snaps, p_obj.nx, p_obj.ny), dtype='f4')
         dset_t = f.create_dataset("time", (num_snaps,), dtype='f4')
         dset_e = f.create_dataset("energy", (num_snaps,), dtype='f4')
+        dset_flux = f.create_dataset("flux", (num_snaps,), dtype='f4')
 
         # 4. Save Initial Condition (Frame 0)
         print(f"Writing Frame 0/{nframes}...", end="\r")
@@ -306,6 +307,16 @@ def run_production_io(p_obj, w0, n0, nframes, steps_per_frame, solver_name="leap
         dset_n[0] = n_real
         dset_phi[0] = phi_real
         dset_t[0] = 0.0
+
+        phi_y0 = np.real(
+            np.fft.ifft2(
+                1j * np.array(grid_params['KY']) * np.array(phi_hat)
+            )
+        )
+
+        flux0 = -p_obj.kappa * n_real * phi_y0
+
+        dset_flux[0] = float(np.mean(flux0))
 
         # 5. Time Loop
         t_start = time.time()
@@ -326,12 +337,21 @@ def run_production_io(p_obj, w0, n0, nframes, steps_per_frame, solver_name="leap
             phi_hat_curr = -w_hat_curr * grid_params['inv_ksq']
             phi_out = np.array(xp.real(xp.fft.ifft2(phi_hat_curr)))
 
+            phi_y_out = np.real(
+                np.fft.ifft2(
+                    1j * np.array(grid_params['KY']) * np.array(phi_hat_curr)
+                )
+            )
+
+            flux_out = -p_obj.kappa * n_out * phi_y_out
+
             # Write
             dset_w[frame] = w_out
             dset_n[frame] = n_out
             dset_phi[frame] = phi_out
             dset_t[frame] = frame * steps_per_frame * p_obj.dt
             dset_e[frame] = float(energy)
+            dset_flux[frame] = float(np.mean(flux_out))
 
             print(f"Writing Frame {frame}/{nframes} | Energy: {energy:.4e}", end="\r")
 
@@ -400,43 +420,62 @@ def run_ad_optimization(p_obj, w0, n0, n_steps, solver="leapfrog"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    # Updated Arguments
-    parser.add_argument("--nframes", type=int, default=20, help="Number of output frames")
-    parser.add_argument("--nts", type=int, default=100, help="Steps between frames (nfdump)")
+    parser.add_argument("--nframes", type=int, default=20)
+    parser.add_argument("--nts", type=int, default=100)
+    parser.add_argument("--solver", type=str, default="leapfrog", choices=["leapfrog", "rk4"])
 
-    parser.add_argument("--solver", type=str, default="leapfrog", choices=["leapfrog", "rk4"],
-                        help="Solver method (default: leapfrog)")
+    parser.add_argument("--dt", type=float, default=0.01)
+    parser.add_argument("--res", type=int, default=128)
 
-    parser.add_argument("--dt", type=float, default=0.01, help="Time step size")
-    parser.add_argument("--res", type=int, default=128, help="Grid Resolution")
-    parser.add_argument("--test_ad", action="store_true", help="Run AD Test")
-    parser.add_argument("--out", type=str, default="mhw_out.h5", help="Output filename")
+    parser.add_argument("--alpha", type=float, default=0.1)
+    parser.add_argument("--kappa", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=0)
+
+    parser.add_argument("--test_ad", action="store_true")
+    parser.add_argument("--ad_steps", type=int, default=5000)
+    parser.add_argument("--out", type=str, default="mhw_out.h5")
+
+    parser.add_argument("--diffw", type=float, default=1e-4)
+    parser.add_argument("--diffn", type=float, default=1e-4)
+    parser.add_argument("--diffop", type=int, default=4)
+
     args = parser.parse_args()
 
-    # 1. Initialize Params
-    params = MHWParams(nx=args.res, ny=args.res, dt=args.dt)
+    params = MHWParams(
+        nx=args.res,
+        ny=args.res,
+        dt=args.dt,
+        alpha=args.alpha,
+        kappa=args.kappa,
+        diffw=args.diffw,
+        diffn=args.diffn,
+        diffop=args.diffop
+    )
 
     params.print_config()
 
-    # 2. Initial Conditions
-    x = np.linspace(0, params.Lx, args.res)
-    y = np.linspace(0, params.Ly, args.res)
-    X, Y = np.meshgrid(x, y)
-
-    #w0 = np.sin(2*np.pi*X/params.Lx) * np.cos(2*np.pi*Y/params.Ly) + 0.1*np.random.randn(args.res, args.res)
-    # random noise
+    np.random.seed(args.seed)
     w0 = 1.e-4 * (np.random.rand(args.res, args.res) - 0.5)
     n0 = w0.copy()
 
     w0_jax = xp.array(w0)
     n0_jax = xp.array(n0)
 
-    # 3. Select Mode
     if args.test_ad:
-        run_ad_optimization(params, w0_jax, n0_jax, n_steps=5000, solver=args.solver)
+        run_ad_optimization(
+            params,
+            w0_jax,
+            n0_jax,
+            n_steps=args.ad_steps,
+            solver=args.solver
+        )
     else:
-        run_production_io(params, w0_jax, n0_jax,
-                          nframes=args.nframes,
-                          steps_per_frame=args.nts,
-                          solver_name=args.solver,
-                          filename=args.out)
+        run_production_io(
+            params,
+            w0_jax,
+            n0_jax,
+            nframes=args.nframes,
+            steps_per_frame=args.nts,
+            solver_name=args.solver,
+            filename=args.out,
+        )
