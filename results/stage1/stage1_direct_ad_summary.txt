@@ -1,0 +1,18 @@
+Stage 1.2 Direct AD Failed Baseline
+
+Direct AD near alpha=0.2:
+steps=500:   -6.17145927e-08
+steps=1000:  -2.20947845e-07
+steps=2000:  -6.00348097e-07
+steps=5000:  -2.62821396e-06
+steps=10000: -4.84927054e-05
+
+Direct AD near alpha=0.8:
+steps=500:   -1.13005222e-08
+steps=1000:  -2.19520894e-08
+steps=2000:  -3.54542179e-08
+steps=5000:  -1.50654089e-07
+steps=10000: -2.25398662e-06
+
+Conclusion:
+Direct AD gradients are time-window dependent and do not match the finite-difference gradients in scale.

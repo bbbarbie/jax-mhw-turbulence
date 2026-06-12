@@ -1,7 +1,6 @@
-.idea/
-.venv/
-__pycache__/
-*.pyc
+runs/*.h5
+runs/*.h50
+logs/*.out
 *.h5
-outputs/
-.DS_Store
+*.h50
+__pycache__/

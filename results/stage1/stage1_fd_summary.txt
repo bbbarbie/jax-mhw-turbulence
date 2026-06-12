@@ -1,0 +1,13 @@
+Stage 1.1 Finite-Difference Baseline
+
+Saturation window: t >= 300
+
+Mean turbulent flux:
+Gamma_bar(0.18) = 0.02776784
+Gamma_bar(0.22) = 0.03121801
+Gamma_bar(0.78) = 0.01744796
+Gamma_bar(0.82) = 0.01702120
+
+Finite-difference gradients:
+dGamma/dalpha near alpha=0.2 = 0.08625416
+dGamma/dalpha near alpha=0.8 = -0.01066905
