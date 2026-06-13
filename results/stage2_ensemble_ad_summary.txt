@@ -1,0 +1,28 @@
+Stage 2.1 IC Ensemble + Short-Window AD Pilot
+
+Settings:
+res = 64 x 64
+dt = 0.0025
+solver = RK4
+diffw = diffn = 1e-3
+diffop = 6
+AD steps = 10000
+seeds = 20 per alpha
+
+Reference finite-difference gradients:
+alpha≈0.2: +8.625416e-02
+alpha≈0.8: -1.066905e-02
+
+Ensemble AD result:
+alpha=0.2:
+mean grad_alpha = -4.826972e-05
+std grad_alpha  = 4.741487e-06
+min/max = -6.105233e-05 / -3.994600e-05
+
+alpha=0.8:
+mean grad_alpha = -1.986666e-06
+std grad_alpha  = 1.824922e-07
+min/max = -2.341146e-06 / -1.650153e-06
+
+Conclusion:
+The IC ensemble reduces seed-to-seed variance, but the ensemble-averaged short-window AD gradients are still several orders of magnitude smaller than the long-time finite-difference sensitivities and do not recover the alpha≈0.2 sign.
