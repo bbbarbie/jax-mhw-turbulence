@@ -1,15 +1,16 @@
-"""Historical baseline HW/MHW JAX solver.
+"""Stage 2 detached-spin-up HW/MHW JAX solver.
 
-This file is retained for reproducibility of the original forward-production
-and direct-AD workflows. It provides HDF5 output for forward runs and the
-historical direct-AD test used in the archived trajectory-length sweep. That AD
-objective accumulates per-step turbulent flux with ``xp.sum(metrics)`` rather
-than returning an arithmetic mean, so comparisons across AD trajectory lengths
-require explicit normalization by the number of AD steps.
+This later implementation preserves the baseline numerical model while adding
+a workflow intended for future statistical-sensitivity experiments: forward
+spin-up is run outside the differentiated window, the nonlinear state can be
+saved or loaded as NPZ, the AD objective is the mean turbulent flux over the
+averaging window, and compact CSV records can be written for postprocessing.
+It also includes finite-value checks and separate spin-up and averaging
+durations.
 
-The later detached-spin-up workflow lives in ``mhw_jax_stage2_ad.py``. This
-baseline file should remain available because it reproduces the historical
-logs and command-line behavior.
+Use this file as the recommended starting point for future detached-state AD
+experiments. The historical accumulated-objective sweep remains reproducible
+with ``mhw_jax.py``.
 """
 
 import time
@@ -375,58 +376,368 @@ def run_production_io(p_obj, w0, n0, nframes, steps_per_frame, solver_name="leap
 
 
 # -----------------------------------------------------------------------------
-# 6. Auto-Differentiation Test
+# 6. Detached Nonlinear-State Auto-Differentiation
 # -----------------------------------------------------------------------------
-def run_ad_optimization(p_obj, w0, n0, n_steps, solver="leapfrog"):
-    print("\n--- Running Auto-Differentiation Test ---")
-    print(f"Solver: {solver} | Target: Turbulent Flux")
+def select_stepper(solver):
+    """Return the requested time-step function."""
+    if solver.lower() == "rk4":
+        return step_rk4
+    return step_leapfrog
+
+
+def time_to_steps(duration, dt, name):
+    """Convert a physical duration to an integer number of time steps."""
+    if duration < 0:
+        raise ValueError(f"{name} must be non-negative")
+
+    steps = int(round(duration / dt))
+    reconstructed = steps * dt
+
+    if not np.isclose(reconstructed, duration, rtol=0.0, atol=1e-12):
+        raise ValueError(
+            f"{name}={duration} is not an integer multiple of dt={dt}. "
+            f"Nearest representable duration is {reconstructed} ({steps} steps)."
+        )
+    return steps
+
+
+def state_is_finite(state):
+    """Return True only when both spectral state arrays contain finite values."""
+    w_hat, n_hat = state
+    finite = xp.logical_and(
+        xp.all(xp.isfinite(w_hat)),
+        xp.all(xp.isfinite(n_hat)),
+    )
+    return bool(np.asarray(jax.device_get(finite)))
+
+
+def save_spectral_state(filename, state, p_obj, elapsed_time):
+    """Save a reusable nonlinear state without reducing it to float32."""
+    w_hat, n_hat = jax.device_get(state)
+    np.savez_compressed(
+        filename,
+        w_hat=np.asarray(w_hat),
+        n_hat=np.asarray(n_hat),
+        nx=np.int64(p_obj.nx),
+        ny=np.int64(p_obj.ny),
+        dt=np.float64(p_obj.dt),
+        alpha=np.float64(p_obj.alpha),
+        kappa=np.float64(p_obj.kappa),
+        diffw=np.float64(p_obj.diffw),
+        diffn=np.float64(p_obj.diffn),
+        diffop=np.int64(p_obj.diffop),
+        modified=np.int64(p_obj.modified),
+        arakawa=np.int64(p_obj.arakawa),
+        elapsed_time=np.float64(elapsed_time),
+    )
+    print(f"Saved detached spin-up state: {filename}")
+
+
+def load_spectral_state(filename, p_obj):
+    """Load a saved spectral state and verify that its configuration matches."""
+    with np.load(filename) as data:
+        checks = {
+            "nx": (int(data["nx"]), p_obj.nx),
+            "ny": (int(data["ny"]), p_obj.ny),
+            "dt": (float(data["dt"]), p_obj.dt),
+            "alpha": (float(data["alpha"]), p_obj.alpha),
+            "kappa": (float(data["kappa"]), p_obj.kappa),
+            "diffw": (float(data["diffw"]), p_obj.diffw),
+            "diffn": (float(data["diffn"]), p_obj.diffn),
+            "diffop": (int(data["diffop"]), p_obj.diffop),
+            "modified": (bool(data["modified"]), p_obj.modified),
+            "arakawa": (bool(data["arakawa"]), p_obj.arakawa),
+        }
+
+        mismatches = []
+        for name, (saved, current) in checks.items():
+            if isinstance(saved, float):
+                same = np.isclose(saved, current, rtol=0.0, atol=1e-14)
+            else:
+                same = saved == current
+            if not same:
+                mismatches.append(f"{name}: saved={saved}, current={current}")
+
+        if mismatches:
+            raise ValueError(
+                "Saved state configuration does not match this run:\n  "
+                + "\n  ".join(mismatches)
+            )
+
+        state = (
+            xp.asarray(data["w_hat"]),
+            xp.asarray(data["n_hat"]),
+        )
+        elapsed_time = float(data["elapsed_time"])
+
+    if not state_is_finite(state):
+        raise FloatingPointError("Loaded state contains NaN or Inf.")
+
+    print(f"Loaded detached spin-up state: {filename}")
+    print(f"Loaded state time: {elapsed_time:.6f}")
+    return state, elapsed_time
+
+
+def run_forward_spinup(p_obj, w0, n0, spinup_steps, solver="leapfrog"):
+    """
+    Run the spin-up as an ordinary forward simulation.
+
+    This function is never differentiated. It returns only the final state, so
+    no spin-up trajectory is retained for reverse-mode AD.
+    """
+    if spinup_steps < 0:
+        raise ValueError("spinup_steps must be non-negative")
 
     grid_params = get_jax_params(p_obj)
-    w_hat_init = xp.fft.fft2(w0)
-    n_hat_init = xp.fft.fft2(n0)
+    phys_params = (p_obj.alpha, p_obj.kappa)
+    stepper = select_stepper(solver)
 
-    if solver.lower() == "rk4":
-        stepper = step_rk4
-    else:
-        stepper = step_leapfrog
+    initial_state = (xp.fft.fft2(w0), xp.fft.fft2(n0))
 
-    def target_function(opt_params):
-        # opt_params is [alpha, kappa] (Tracer)
-        alpha_in = opt_params[0]
-        kappa_in = opt_params[1]
-        phys_params = (alpha_in, kappa_in)
+    if spinup_steps == 0:
+        return initial_state
 
-        init_state = (w_hat_init, n_hat_init)
+    @jit
+    def spinup_scan(state):
+        def body(carrier, _):
+            next_state = stepper(carrier, (grid_params, phys_params))
+            return next_state, None
+
+        final_state, _ = scan_wrapper(
+            body,
+            state,
+            xp.arange(spinup_steps),
+        )
+        return final_state
+
+    final_state = spinup_scan(initial_state)
+    if ENABLE_JAX:
+        final_state[0].block_until_ready()
+    return final_state
+
+
+def run_ad_window(p_obj, spun_state, avg_steps, solver="leapfrog"):
+    """
+    Differentiate only through the averaging window.
+
+    The nonlinear starting state is explicitly detached. The objective is the
+    time mean of the spatially averaged turbulent flux.
+    """
+    if avg_steps <= 0:
+        raise ValueError("avg_steps must be positive")
+    if not ENABLE_JAX:
+        raise RuntimeError("The AD test requires JAX.")
+
+    grid_params = get_jax_params(p_obj)
+    stepper = select_stepper(solver)
+    kappa_fixed = xp.asarray(p_obj.kappa)
+
+    # Critical separation: the gradient cannot propagate through spin-up.
+    fixed_state = jax.tree_util.tree_map(
+        jax.lax.stop_gradient,
+        spun_state,
+    )
+
+    def objective(alpha_in):
+        phys_params = (alpha_in, kappa_fixed)
 
         def body(carrier, _):
-            params_packed = (grid_params, phys_params)
-            next_state = stepper(carrier, params_packed)
+            next_state = stepper(carrier, (grid_params, phys_params))
+            w_hat, n_hat = next_state
 
-            w_c, n_c = next_state
-            # Metric: Kinetic Energy
-            phi_hat = -w_c * grid_params['inv_ksq']
-            phi_y_hat = 1j * grid_params['KY'] * phi_hat
-            phi_y = xp.real(xp.fft.ifft2(phi_y_hat))
-            n_real = xp.real(xp.fft.ifft2(n_c))
-            # Turbulent Flux: Gamma = -kappa * n * dphi/dy
-            flux = -kappa_in * n_real * phi_y
-            mean_flux = xp.mean(flux)
+            phi_hat = -w_hat * grid_params["inv_ksq"]
+            phi_y = xp.real(
+                xp.fft.ifft2(1j * grid_params["KY"] * phi_hat)
+            )
+            n_real = xp.real(xp.fft.ifft2(n_hat))
 
-            return next_state, mean_flux
+            instantaneous_mean_flux = xp.mean(
+                -kappa_fixed * n_real * phi_y
+            )
+            return next_state, instantaneous_mean_flux
 
-        final_state, metrics = scan_wrapper(body, init_state, xp.arange(n_steps))
+        _, flux_series = scan_wrapper(
+            body,
+            fixed_state,
+            xp.arange(avg_steps),
+        )
 
-        return xp.sum(metrics)
+        # Long-time quantity is an average, not a sum.
+        return xp.mean(flux_series)
 
-    initial_params = xp.array([p_obj.alpha, p_obj.kappa])
+    alpha0 = xp.asarray(p_obj.alpha)
+    mean_flux, grad_alpha = value_and_grad(objective)(alpha0)
 
-    t0 = time.time()
-    val, gradients = value_and_grad(target_function)(initial_params)
-    t1 = time.time()
+    if ENABLE_JAX:
+        mean_flux.block_until_ready()
 
-    print(f"Objective Value: {val:.4e}")
-    print(f"Gradient w.r.t [alpha, kappa]: {gradients}")
-    print(f"Time: {t1-t0:.4f}s")
+    return mean_flux, grad_alpha
+
+
+def append_result_csv(filename, row):
+    """Append one AD result to a CSV file."""
+    import csv
+
+    fieldnames = [
+        "resolution",
+        "dt",
+        "alpha",
+        "kappa",
+        "diffw",
+        "diffn",
+        "diffop",
+        "solver",
+        "seed",
+        "spinup_time",
+        "avg_time",
+        "avg_steps",
+        "mean_flux",
+        "grad_alpha",
+        "finite",
+        "spinup_runtime_s",
+        "ad_runtime_s",
+    ]
+
+    file_exists = os.path.exists(filename)
+    with open(filename, "a", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(row)
+
+    print(f"Appended result: {filename}")
+
+
+def run_nonlinear_state_ad_test(
+    p_obj,
+    w0,
+    n0,
+    spinup_time,
+    avg_time,
+    solver="leapfrog",
+    seed=0,
+    state_in=None,
+    state_out=None,
+    result_csv=None,
+):
+    """
+    Run forward-only spin-up, detach the final state, and differentiate only
+    through the requested averaging window.
+    """
+    spinup_steps = time_to_steps(spinup_time, p_obj.dt, "spinup_time")
+    avg_steps = time_to_steps(avg_time, p_obj.dt, "avg_time")
+
+    if avg_steps <= 0:
+        raise ValueError("avg_time must contain at least one time step.")
+
+    print("\n--- Detached Nonlinear-State Direct AD ---")
+    print(f"Solver: {solver}")
+    print(f"Requested spin-up time: {spinup_time:.6f}")
+    print(f"Forward-only spin-up steps: {spinup_steps}")
+    print(f"Requested averaging time: {avg_time:.6f}")
+    print(f"Differentiated averaging steps: {avg_steps}")
+    print("Objective: time-mean turbulent flux")
+    print("Gradient: d(mean flux)/d(alpha), with kappa fixed")
+
+    spinup_start = time.time()
+
+    if state_in:
+        spun_state, actual_spinup_time = load_spectral_state(
+            state_in,
+            p_obj,
+        )
+        spinup_runtime = time.time() - spinup_start
+
+        if not np.isclose(
+            actual_spinup_time,
+            spinup_time,
+            rtol=0.0,
+            atol=1e-12,
+        ):
+            raise ValueError(
+                f"Loaded state time is {actual_spinup_time}, "
+                f"but --spinup_time is {spinup_time}."
+            )
+    else:
+        spun_state = run_forward_spinup(
+            p_obj,
+            w0,
+            n0,
+            spinup_steps=spinup_steps,
+            solver=solver,
+        )
+        actual_spinup_time = spinup_steps * p_obj.dt
+        spinup_runtime = time.time() - spinup_start
+
+    finite_spinup = state_is_finite(spun_state)
+
+    print(f"Spin-up final time: {actual_spinup_time:.6f}")
+    print(f"Spin-up state finite: {finite_spinup}")
+    print(f"Spin-up/load runtime: {spinup_runtime:.4f} s")
+
+    if not finite_spinup:
+        raise FloatingPointError(
+            "Spin-up produced NaN/Inf before the AD window. "
+            "This state cannot be used for sensitivity analysis."
+        )
+
+    if state_out and not state_in:
+        save_spectral_state(
+            state_out,
+            spun_state,
+            p_obj,
+            elapsed_time=actual_spinup_time,
+        )
+
+    ad_start = time.time()
+    mean_flux, grad_alpha = run_ad_window(
+        p_obj,
+        spun_state,
+        avg_steps=avg_steps,
+        solver=solver,
+    )
+    ad_runtime = time.time() - ad_start
+
+    mean_flux_value = float(jax.device_get(mean_flux))
+    grad_alpha_value = float(jax.device_get(grad_alpha))
+    finite_result = bool(
+        np.isfinite(mean_flux_value)
+        and np.isfinite(grad_alpha_value)
+    )
+
+    print("\n--- Result ---")
+    print(f"Window start time: {actual_spinup_time:.6f}")
+    print(f"Window end time: {actual_spinup_time + avg_time:.6f}")
+    print(f"Mean flux: {mean_flux_value:.12e}")
+    print(f"d(mean flux)/d(alpha): {grad_alpha_value:.12e}")
+    print(f"Finite result: {finite_result}")
+    print(f"AD-window runtime: {ad_runtime:.4f} s")
+
+    result = {
+        "resolution": p_obj.nx,
+        "dt": p_obj.dt,
+        "alpha": p_obj.alpha,
+        "kappa": p_obj.kappa,
+        "diffw": p_obj.diffw,
+        "diffn": p_obj.diffn,
+        "diffop": p_obj.diffop,
+        "solver": solver,
+        "seed": seed,
+        "spinup_time": actual_spinup_time,
+        "avg_time": avg_time,
+        "avg_steps": avg_steps,
+        "mean_flux": mean_flux_value,
+        "grad_alpha": grad_alpha_value,
+        "finite": finite_result,
+        "spinup_runtime_s": spinup_runtime,
+        "ad_runtime_s": ad_runtime,
+    }
+
+    if result_csv:
+        append_result_csv(result_csv, result)
+
+    return result
+
 
 # -----------------------------------------------------------------------------
 # 7. Main Execution
@@ -434,24 +745,63 @@ def run_ad_optimization(p_obj, w0, n0, n_steps, solver="leapfrog"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
+    # Production run.
     parser.add_argument("--nframes", type=int, default=20)
     parser.add_argument("--nts", type=int, default=100)
-    parser.add_argument("--solver", type=str, default="leapfrog", choices=["leapfrog", "rk4"])
+    parser.add_argument("--out", type=str, default="mhw_out.h5")
 
+    # Numerical setup. Defaults preserve the supplied Stage-1 code.
+    parser.add_argument(
+        "--solver",
+        type=str,
+        default="leapfrog",
+        choices=["leapfrog", "rk4"],
+    )
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--res", type=int, default=128)
-
     parser.add_argument("--alpha", type=float, default=0.1)
     parser.add_argument("--kappa", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=0)
-
-    parser.add_argument("--test_ad", action="store_true")
-    parser.add_argument("--ad_steps", type=int, default=5000)
-    parser.add_argument("--out", type=str, default="mhw_out.h5")
-
     parser.add_argument("--diffw", type=float, default=1e-4)
     parser.add_argument("--diffn", type=float, default=1e-4)
     parser.add_argument("--diffop", type=int, default=4)
+
+    # Detached AD mode, expressed in physical simulation time.
+    parser.add_argument(
+        "--test_ad",
+        action="store_true",
+        help="Run detached nonlinear-state direct AD.",
+    )
+    parser.add_argument(
+        "--spinup_time",
+        type=float,
+        default=300.0,
+        help="Forward-only simulation time before the AD window.",
+    )
+    parser.add_argument(
+        "--avg_time",
+        type=float,
+        default=1.0,
+        help="Physical duration of the differentiated averaging window.",
+    )
+    parser.add_argument(
+        "--state_in",
+        type=str,
+        default=None,
+        help="Load a previously saved spectral spin-up state (.npz).",
+    )
+    parser.add_argument(
+        "--state_out",
+        type=str,
+        default=None,
+        help="Save the forward-spun spectral state for reuse (.npz).",
+    )
+    parser.add_argument(
+        "--result_csv",
+        type=str,
+        default=None,
+        help="Append the AD result to this CSV file.",
+    )
 
     args = parser.parse_args()
 
@@ -463,25 +813,32 @@ if __name__ == "__main__":
         kappa=args.kappa,
         diffw=args.diffw,
         diffn=args.diffn,
-        diffop=args.diffop
+        diffop=args.diffop,
     )
-
     params.print_config()
 
+    # Preserve the original Stage-1 initialization exactly.
     np.random.seed(args.seed)
-    w0 = 1.e-4 * (np.random.rand(args.res, args.res) - 0.5)
+    w0 = 1.e-4 * (
+        np.random.rand(args.res, args.res) - 0.5
+    )
     n0 = w0.copy()
 
-    w0_jax = xp.array(w0)
-    n0_jax = xp.array(n0)
+    w0_jax = xp.asarray(w0)
+    n0_jax = xp.asarray(n0)
 
     if args.test_ad:
-        run_ad_optimization(
+        run_nonlinear_state_ad_test(
             params,
             w0_jax,
             n0_jax,
-            n_steps=args.ad_steps,
-            solver=args.solver
+            spinup_time=args.spinup_time,
+            avg_time=args.avg_time,
+            solver=args.solver,
+            seed=args.seed,
+            state_in=args.state_in,
+            state_out=args.state_out,
+            result_csv=args.result_csv,
         )
     else:
         run_production_io(

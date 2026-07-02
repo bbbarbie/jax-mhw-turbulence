@@ -1,0 +1,60 @@
+category,alpha,resolution,dt,solver,steps_or_final_time,status,output,source_log,notes
+finite_difference_production,0.18,256,0.0025,rk4,400000 steps; T=1000,completed,runs/mhw_256_T1000_a018.h5,results/raw_logs/finite_difference/mhw_a018-54261699.out,HDF5 output is not available in this local archive
+finite_difference_production,0.22,256,0.0025,rk4,400000 steps; T=1000,completed,runs/mhw_256_T1000_a022.h5,results/raw_logs/finite_difference/mhw_a022-54261701.out,HDF5 output is not available in this local archive
+finite_difference_production,0.78,256,0.0025,rk4,400000 steps; T=1000,completed,runs/mhw_256_T1000_a078.h5,results/raw_logs/finite_difference/mhw_a078-54261704.out,HDF5 output is not available in this local archive
+finite_difference_production,0.82,256,0.0025,rk4,400000 steps; T=1000,completed,runs/mhw_256_T1000_a082.h5,results/raw_logs/finite_difference/mhw_a082-54261705.out,HDF5 output is not available in this local archive
+finite_difference_production,1.0,256,0.0025,rk4,400000 steps; T=1000,completed,runs/mhw_256_T1000_a1.h50,results/raw_logs/finite_difference/mhw_a1_T1000-54225942.out,HDF5 output is not available in this local archive
+historical_direct_ad_sweep,0.2,64,0.0025,rk4,1000 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a02_s1000-54333964.out,historical accumulated objective; no detached saturated spin-up
+historical_direct_ad_sweep,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a02_s10000-54333968.out,historical accumulated objective; no detached saturated spin-up
+historical_direct_ad_sweep,0.2,64,0.0025,rk4,2000 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a02_s2000-54333965.out,historical accumulated objective; no detached saturated spin-up
+historical_direct_ad_sweep,0.2,64,0.0025,rk4,500 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a02_s500-54333963.out,historical accumulated objective; no detached saturated spin-up
+historical_direct_ad_sweep,0.2,64,0.0025,rk4,5000 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a02_s5000-54333967.out,historical accumulated objective; no detached saturated spin-up
+historical_direct_ad_sweep,0.8,64,0.0025,rk4,1000 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a08_s1000-54334194.out,historical accumulated objective; no detached saturated spin-up
+historical_direct_ad_sweep,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a08_s10000-54334200.out,historical accumulated objective; no detached saturated spin-up
+historical_direct_ad_sweep,0.8,64,0.0025,rk4,2000 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a08_s2000-54334196.out,historical accumulated objective; no detached saturated spin-up
+historical_direct_ad_sweep,0.8,64,0.0025,rk4,500 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a08_s500-54334192.out,historical accumulated objective; no detached saturated spin-up
+historical_direct_ad_sweep,0.8,64,0.0025,rk4,5000 AD steps,completed,log only,results/raw_logs/direct_ad/ad_a08_s5000-54334198.out,historical accumulated objective; no detached saturated spin-up
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_0.out,array index 0; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_1.out,array index 1; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_10.out,array index 10; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_11.out,array index 11; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_12.out,array index 12; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_13.out,array index 13; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_14.out,array index 14; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_15.out,array index 15; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_16.out,array index 16; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_17.out,array index 17; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_18.out,array index 18; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_19.out,array index 19; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_2.out,array index 2; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_20.out,array index 20; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_21.out,array index 21; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_22.out,array index 22; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_23.out,array index 23; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_24.out,array index 24; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_25.out,array index 25; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_26.out,array index 26; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_27.out,array index 27; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_28.out,array index 28; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_29.out,array index 29; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_3.out,array index 3; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_30.out,array index 30; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_31.out,array index 31; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_32.out,array index 32; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_33.out,array index 33; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_34.out,array index 34; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_35.out,array index 35; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_36.out,array index 36; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_37.out,array index 37; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_38.out,array index 38; seed mapping not recoverable from available artifacts
+ensemble_ad,0.8,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_39.out,array index 39; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_4.out,array index 4; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_5.out,array index 5; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_6.out,array index 6; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_7.out,array index 7; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_8.out,array index 8; seed mapping not recoverable from available artifacts
+ensemble_ad,0.2,64,0.0025,rk4,10000 AD steps,completed,log only,results/raw_logs/ensemble_ad/ens_ad-54341982_9.out,array index 9; seed mapping not recoverable from available artifacts
+failure_or_debug,,,,,,failed,log only,results/raw_logs/failures/results/forward_check_a08_r128.log,see failure log for exact message
+failure_or_debug,,,,,,failed,log only,results/raw_logs/failures/root/forward_check_a08_r128.log,see failure log for exact message
+failure_or_debug,,,,,,failed,log only,results/raw_logs/failures/validation_a08_r128_t200.log,see failure log for exact message
+failure_or_debug,,,,,,completed,log only,results/raw_logs/failures/mhw_debug-54226559.out,see failure log for exact message

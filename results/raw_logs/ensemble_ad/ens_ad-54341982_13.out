@@ -1,0 +1,26 @@
+Running with JAX backend on cpu:0
+
+========================================
+       MHW MODEL CONFIGURATION
+========================================
+Domain:      64.0 x 64.0
+Resolution:  64 x 64 (dx=1.0000, dy=1.0000)
+Time Step:   dt = 0.0025
+----------------------------------------
+Physics:     Alpha = 0.2
+             Kappa = 1.0
+----------------------------------------
+Dissipation: order = 6
+             nu_w  = 0.001
+             nu_n  = 0.001
+----------------------------------------
+Flags:       Modified HW = True
+             Arakawa     = True
+========================================
+
+
+--- Running Auto-Differentiation Test ---
+Solver: rk4 | Target: Turbulent Flux
+Objective Value: 9.5775e-06
+Gradient w.r.t [alpha, kappa]: [-3.99459970e-05  7.09477971e-05]
+Time: 2.7121s

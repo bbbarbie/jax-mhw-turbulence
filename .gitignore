@@ -1,8 +1,17 @@
+# Large simulation outputs and scratch logs.
 runs/*.h5
 runs/*.h50
+runs/*.npz
 logs/*.out
 *.h5
 *.h50
+*.npz
+
+# Python and local editor/cache files.
 __pycache__/
-*.h5
-*.h50
+*.pyc
+.pytest_cache/
+.idea/
+
+# Curated scientific evidence under results/raw_logs/ is intentionally
+# trackable. Do not ignore results/raw_logs/**/*.out.
