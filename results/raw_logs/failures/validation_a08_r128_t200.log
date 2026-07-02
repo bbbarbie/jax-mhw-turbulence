@@ -1,0 +1,2 @@
+srun: error: No architecture specified, cannot estimate job costs.
+srun: error: Unable to allocate resources: Unspecified error

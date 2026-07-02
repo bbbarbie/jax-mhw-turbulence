@@ -1,0 +1,27 @@
+Running with JAX backend on cpu:0
+
+========================================
+       MHW MODEL CONFIGURATION
+========================================
+Domain:      64.0 x 64.0
+Resolution:  64 x 64 (dx=1.0000, dy=1.0000)
+Time Step:   dt = 0.0025
+----------------------------------------
+Physics:     Alpha = 1.0
+             Kappa = 1.0
+----------------------------------------
+Dissipation: order = 6
+             nu_w  = 0.001
+             nu_n  = 0.001
+----------------------------------------
+Flags:       Modified HW = True
+             Arakawa     = True
+========================================
+
+
+--- Starting Production Run (HDF5 Output) ---
+Frames: 20, Steps/Frame: 100, Total Steps: 2000
+Solver: rk4
+Writing Frame 0/20...Writing Frame 1/20 | Energy: 3.4573e-10Writing Frame 2/20 | Energy: 1.6398e-10Writing Frame 3/20 | Energy: 8.6858e-11Writing Frame 4/20 | Energy: 5.1677e-11Writing Frame 5/20 | Energy: 3.4689e-11Writing Frame 6/20 | Energy: 2.6030e-11Writing Frame 7/20 | Energy: 2.1376e-11Writing Frame 8/20 | Energy: 1.8755e-11Writing Frame 9/20 | Energy: 1.7228e-11Writing Frame 10/20 | Energy: 1.6326e-11Writing Frame 11/20 | Energy: 1.5803e-11Writing Frame 12/20 | Energy: 1.5520e-11Writing Frame 13/20 | Energy: 1.5396e-11Writing Frame 14/20 | Energy: 1.5381e-11Writing Frame 15/20 | Energy: 1.5443e-11Writing Frame 16/20 | Energy: 1.5559e-11Writing Frame 17/20 | Energy: 1.5716e-11Writing Frame 18/20 | Energy: 1.5904e-11Writing Frame 19/20 | Energy: 1.6117e-11Writing Frame 20/20 | Energy: 1.6352e-11
+Finished. Saved to runs/debug_a1.h5
+Total time: 1.36s | Speed: 1474 steps/s

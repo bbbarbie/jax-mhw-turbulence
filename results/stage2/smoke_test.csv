@@ -1,0 +1,2 @@
+resolution,dt,alpha,kappa,diffw,diffn,diffop,solver,seed,spinup_time,avg_time,avg_steps,mean_flux,grad_alpha,finite,spinup_runtime_s,ad_runtime_s
+8,0.0025,0.8,1.0,0.001,0.001,6,rk4,0,0.005,0.005,2,2.8873755572649095e-11,-5.8077174185957346e-12,True,1.9846086502075195,4.79111647605896
