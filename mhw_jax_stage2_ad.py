@@ -157,8 +157,32 @@ def arakawa(f, g, dx, dy):
 
     j1 = (f1 - f2) * (g3 - g4) - (f3 - f4) * (g1 - g2)
     j2 = f1 * (g5 - g7) - f2 * (g8 - g6) - f3 * (g5 - g8) + f4 * (g7 - g6)
-    j3 = f5 * (g3 - g1) - f6 * (g4 - g2) - f7 * (g4 - g1) + f8 * (g3 - g2)
+    # J^{x+} term.  BUG FIX (sensitivity project, 2026-09): the archived version
+    #   j3 = f5*(g3 - g1) - f6*(g4 - g2) - f7*(g4 - g1) + f8*(g3 - g2)
+    # had the wrong sign on the f6 and f8 terms.  The result was still exactly
+    # antisymmetric/conservative (sum f*J = sum g*J = 0) but was NOT a
+    # consistent approximation of the Jacobian: relative error 0.6 at 64^2 and
+    # 2.5 at 256^2 against an analytic test.  The archived operator is kept
+    # below as ``arakawa_archived`` for reproducing the historical logs.
+    j3 = f5 * (g3 - g1) - f6 * (g2 - g4) - f8 * (g3 - g2) + f7 * (g1 - g4)
 
+    return (j1 + j2 + j3) / (12.0 * dx * dy)
+
+
+@jit
+def arakawa_archived(f, g, dx, dy):
+    """Archived (buggy) Arakawa bracket, retained only for provenance of the
+    historical logs under results/raw_logs.  Do not use for new runs."""
+    def pad_periodic(arr):
+        return jnp.pad(arr, ((1,1), (1,1)), mode='wrap')
+    fp = pad_periodic(f); gp = pad_periodic(g)
+    f1 = fp[2:, 1:-1]; f2 = fp[0:-2, 1:-1]; f3 = fp[1:-1, 2:]; f4 = fp[1:-1, 0:-2]
+    f5 = fp[2:, 2:];   f6 = fp[0:-2, 0:-2]; f7 = fp[2:, 0:-2]; f8 = fp[0:-2, 2:]
+    g1 = gp[2:, 1:-1]; g2 = gp[0:-2, 1:-1]; g3 = gp[1:-1, 2:]; g4 = gp[1:-1, 0:-2]
+    g5 = gp[2:, 2:];   g6 = gp[0:-2, 0:-2]; g7 = gp[2:, 0:-2]; g8 = gp[0:-2, 2:]
+    j1 = (f1 - f2) * (g3 - g4) - (f3 - f4) * (g1 - g2)
+    j2 = f1 * (g5 - g7) - f2 * (g8 - g6) - f3 * (g5 - g8) + f4 * (g7 - g6)
+    j3 = f5 * (g3 - g1) - f6 * (g4 - g2) - f7 * (g4 - g1) + f8 * (g3 - g2)
     return (j1 + j2 + j3) / (12.0 * dx * dy)
 
 @jit
