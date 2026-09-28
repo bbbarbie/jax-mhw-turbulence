@@ -126,7 +126,8 @@ if PART == "plot":
     fd_vals = np.array(res["fd"]["values"])
     sol = None
 t0 = time.time()
-fd_vals, gp_all, gm_all = [], [], []
+if PART != "plot":
+    fd_vals, gp_all, gm_all = [], [], []
 nfd = int(round(args.fd_T / dt))
 for sd in (range(args.fd_seeds) if PART != "plot" else []):
     us, _, _ = get_spun_state(S, 100 + sd, args.tspin)

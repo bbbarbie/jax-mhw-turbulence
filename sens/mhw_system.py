@@ -88,6 +88,24 @@ class MHWSystem:
         return jnp.stack([jnp.real(jnp.fft.ifft2(dw)),
                           jnp.real(jnp.fft.ifft2(dn))])
 
+    def step_inverse(self, u, s):
+        """Approximate inverse map: undo the damping factor, then RK4 with -dt
+        (exact to O(dt^5) for the RK4 part).  Used only to build the central
+        neutral direction ``f_central``."""
+        gp = dict(self.gp)
+        gp["dt"] = -self.dt
+        gp["damp_w"] = jnp.ones_like(self.gp["damp_w"])
+        gp["damp_n"] = jnp.ones_like(self.gp["damp_n"])
+        w_hat = jnp.fft.fft2(u[0]) / self.gp["damp_w"]
+        n_hat = jnp.fft.fft2(u[1]) / self.gp["damp_n"]
+        w2, n2 = step_rk4((w_hat, n_hat), (gp, (s, self.kappa)))
+        return jnp.stack([jnp.real(jnp.fft.ifft2(w2)),
+                          jnp.real(jnp.fft.ifft2(n2))])
+
+    def f_central(self, u, s):
+        """Central-difference neutral direction (step(u) - step^{-1}(u)) / (2 dt)."""
+        return (self.step(u, s) - self.step_inverse(u, s)) / (2 * self.dt)
+
     # -- diagnostics ---------------------------------------------------------
     def phi_hat(self, w):
         return -jnp.fft.fft2(w) * self.gp["inv_ksq"]

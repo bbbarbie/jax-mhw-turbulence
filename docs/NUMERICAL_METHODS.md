@@ -48,6 +48,15 @@ Two nonlinear bracket implementations are available:
 The `arakawa` flag selects between these implementations. All archived
 production and AD logs used Arakawa.
 
+**Bug found 2026-09:** the archived `arakawa` had two sign errors in its
+`J^{x+}` (`j3`) term.  The operator was exactly antisymmetric (energy- and
+enstrophy-conserving) but not a consistent approximation of the Jacobian
+(relative error 0.64 at 64^2, 1.3 at 128^2, 2.5 at 256^2 against an analytic
+test; the corrected operator gives 2.6e-2, 6.5e-3, 1.6e-3).  It is fixed in
+`mhw_jax_stage2_ad.py`; the archived operator is kept there as
+`arakawa_archived`, and `mhw_jax.py` is unchanged for log reproducibility.
+See `results.md` Section 0.2.
+
 ## Right-Hand Side
 
 The implemented RHS computes:

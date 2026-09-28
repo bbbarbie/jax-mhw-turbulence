@@ -90,78 +90,6 @@ attempted; the archive's own 256^2 runs took 1.6 h each on NERSC.
 
 ---
 
-## 3. NILSS on Lorenz 63  (done first because it gates everything else)
-
-`sens/nilss.py` implements Ni & Wang (2017) as described in its module
-docstring; the authors' prototype (`github.com/niangxiu/nilss`) was used to
-cross-check every formula (the paper itself is not reachable from this
-container: arXiv and ScienceDirect are blocked by the egress proxy, so equation
-numbers are not quoted).  Per segment: `M` homogeneous tangents and one
-inhomogeneous tangent by `jax.jvp` of the RK4 step (vmapped over M+1), projected
-orthogonally to the neutral direction `f` at every step to form
-`C_i = int W_perp^T W_perp dt`, `d_i = int W_perp^T v*_perp dt`; at the boundary
-`W_perp = Q R`, `b = Q^T v*_perp`, restart `W <- Q`, `v* <- v*_perp - Q b`;
-constrained least squares `min sum a_i^T C_i a_i + 2 d_i^T a_i` s.t.
-`a_{i+1} = R_i a_i + b_i` by a sparse KKT solve; sensitivity assembled with the
-time-dilation term.  Two algebraically equivalent assemblies are computed:
-form A (`dJds_ibp`, integration by parts, identical to the authors' code) and form
-B (`dJds`, discretely consistent: per-step `xi` differences).  They agree to
-< 1e-3 at dt = 0.01 and converge together as dt -> 0 (Table 3b).
-
-Settings: sigma = 10, beta = 8/3, rho = 28, J = z, s = rho, RK4 with dt = 0.01,
-warm-up 200 t.u., 10 discarded warm-up segments, `v*(0) = 0`, `W(0)` random
-orthonormal.
-
-**A necessary implementation choice (found by the DT check failing).**  With the
-discrete neutral direction `f = (u_{n+1} - u_n)/dt` the result depended on the
-segment length (1.05 / 1.30 +/- 0.17 / 2.45 +/- 1.2 for DT = 1, 2, 4) and on dt.
-That direction is neutral for the RK4 map only to O(dt^2) per step, whereas the
-ODE right-hand side is neutral to O(dt^5); with `f = RHS` the dependence vanished
-(table below).  All NILSS results in this document use `f = RHS` (for MHW: the
-semi-discrete RHS `rhs_hw - nu k^6 (.)`, `MHWSystem.rhs`).
-
-### Table 3: Lorenz 63, d<z>/drho  (`experiments/task3_nilss_lorenz.py`)
-
-| estimate | value | settings |
-|---|---|---|
-| FD (central) | **1.0025 +/- 0.0014** | drho = 0.5, 20 independent trajectories x T = 20 000, SE over trajectories |
-| NILSS, M = 1 | **1.0135** | DT = 2, T = 20 000 (K = 10 000 segments) |
-| NILSS, M = 2 | 1.0135 | same (identical to 4 digits; the extra direction is stable) |
-| NILSS scatter | 1.0137 +/- 0.0002 (std over 10 trajectories) | M = 1, DT = 2, T = 2000 each |
-| DT = 1 / 2 / 4 | 1.0135 / 1.0136 / 1.0134 (+/- 1e-4) | M = 1, T = 4000, 4 trajectories each |
-| literature | ~1.01 | Ni & Wang 2017 (value taken from the brief; the paper could not be opened here) |
-| max \|v_perp\| | 1.9 (mean 0.65) | bounded over T = 20 000 |
-| wall time | 9 s for T = 20 000 (M = 1) | |
-
-Convergence with T (M = 1): 1.0104 (T = 50), 1.0143 (104), 1.0134 (222), 1.0134
-(472), 1.0134 (998), 1.0138 (2114), 1.0135 (4472), 1.0136 (9456), 1.0135
-(20 000).  The statistical error |NILSS(T) - NILSS(20 000)| falls faster than
-T^{-1/2} (Fig. 3, middle), from 3e-3 at T = 50 to < 1e-4 by T ~ 5000.
-
-![Task 3](results/sens/fig_task3_lorenz.png)
-
-### Table 3b: the 1 % gap is real  (`experiments/task3b_lorenz_checks.py`)
-
-| check | result |
-|---|---|
-| FD, drho = 0.25 / 0.5 / 1.0 / 2.0 (20 x T = 20 000, dt = 0.01) | 1.0108 +/- 0.0033 / 1.0025 +/- 0.0014 / 1.0029 +/- 0.0010 / 1.0016 +/- 0.0005 |
-| FD on the dt = 0.0025 map (drho = 0.5, 10 x T = 20 000) | 1.0009 +/- 0.0027 |
-| NILSS, dt = 0.02 / 0.01 / 0.005 / 0.0025 (form B; T = 4000, DT = 2) | 1.0086 / 1.0138 / 1.0156 / 1.0164 |
-| NILSS, same, form A | 1.0132 / 1.0158 / 1.0162 / 1.0166 |
-
-**Acceptance: partly met.**  NILSS is insensitive to M >= 1, to DT over a factor
-4, converges with T, and lies within 0.4 % of the literature value 1.01.  It does
-*not* lie within my FD error bar: NILSS -> 1.016 as dt -> 0 while FD is
-1.002-1.003 +/- 0.001 for every drho, a 1.1-1.4 % gap that is ~8 sigma of the FD
-error and is robust to M, DT, T, dt and assembly form.  The published
-comparisons had FD error bars of a few percent and could not see this.  I
-believe it is the known limitation of shadowing estimators (they omit the
-"unstable contribution" of Ruelle's linear response, which need not vanish for a
-system that is not uniformly hyperbolic, cf. Chandramoorthy & Wang 2021, Ni 2020);
-I have not proven that here.  See "What I'm not sure about".
-
----
-
 ## 1. T-sweep: direct forward-mode AD diverges at rate lambda_1  (`experiments/task1_ad_vs_fd.py`)
 
 Setup (both regimes): 64^2, kappa = 1, nu = 1e-3 (k^6), dt = 0.0025, fixed
@@ -339,7 +267,7 @@ lambda_1 itself moves by 34-81 % between 64^2 and 128^2 and the flux by 3-8x, th
 dissipation range is not resolved at 64^2, and the same is presumably true of
 N_+.
 
-### Table 2c: Benettin lambda_1 over t in [300, 1000], 64^2, alpha = 0.8, five seeds (`scratch: benettin_long`, JSON `results/sens/benettin_long_a0.8_res64_T700.json`)
+### Table 2c: Benettin lambda_1 over t in [300, 1000], 64^2, alpha = 0.8, five seeds (`experiments/task2_benettin_long.py 0.8 700 0,1,2,3,4`)
 
 | seed | lambda_1 (batched SE) | 100-t.u. window values |
 |---|---|---|
@@ -354,7 +282,7 @@ Seeds 3 and 4 are the low-flux states of Task 1 (Gamma_T ~ 0.25 vs 0.41-0.45).
 At alpha = 0.8, 64^2, "lambda_1" is only defined to ~20 % on the 700-t.u. scale
 because the system wanders between states with different zonal-flow strength.
 
-### Table 2d: how N_+ depends on the box and the viscosity (32^2, alpha = 0.2, T = 100, seed 0)
+### Table 2d: how N_+ depends on the box and the viscosity (32^2, alpha = 0.2, T = 100, seed 0; `experiments/task2_spectrum_box.py`, `task2_spectrum_M.py`, `task2_lambda1_resolution.py`)
 
 | box L | nu | M | N_+ | lambda_1 | lambda_M | sum of M | state |
 |---|---|---|---|---|---|---|---|
@@ -364,6 +292,8 @@ because the system wanders between states with different zonal-flow strength.
 | 32 | 1e-3 | 40 | >= 40 | 0.309 +/- 0.008 | 0.188 | +9.56 | Gamma = 1.90 +/- 0.21, E = 11.3, 5.6 % high-k |
 | **16** | **1e-3** | 40 | **22** | 0.112 +/- 0.018 | -0.048 | +0.61 | Gamma = 0.217 +/- 0.057, E = 3.34, fully resolved |
 | 64 (alpha = 0.8) | 0.03 | 40 | >= 40 | 0.028 +/- 0.005 | 0.0095 | +0.71 | Gamma = 1.27 +/- 0.37 |
+
+![Task 2, spectrum vs box size](results/sens/fig_task2_spectrum_box.png)
 
 N_+ is set by the number of large-scale modes the box admits, not by the
 viscosity: at L = 64 raising nu by 100x leaves > 100 positive exponents (all
@@ -379,3 +309,228 @@ resolution convergence fails (lambda_1 and the flux change by 34-81 % and 3-8x
 between 64^2 and 128^2); N_+ at the archive box is only bounded below (> 100 at
 32^2 even with 100x viscosity, >= 40 at 64^2); the only regime with N_+ <= ~20
 is the archive physics in a 16 x 16 box (N_+ = 22), which is what Task 4 uses.
+
+## 3. NILSS on Lorenz 63  (run first: it gates Task 4)
+
+`sens/nilss.py` implements Ni & Wang (2017) as described in its module
+docstring; the authors' prototype (`github.com/niangxiu/nilss`) was used to
+cross-check every formula (the paper itself is not reachable from this
+container: arXiv and ScienceDirect are blocked by the egress proxy, so equation
+numbers are not quoted).  Per segment: `M` homogeneous tangents and one
+inhomogeneous tangent by `jax.jvp` of the RK4 step (vmapped over M+1), projected
+orthogonally to the neutral direction `f` at every step to form
+`C_i = int W_perp^T W_perp dt`, `d_i = int W_perp^T v*_perp dt`; at the boundary
+`W_perp = Q R`, `b = Q^T v*_perp`, restart `W <- Q`, `v* <- v*_perp - Q b`;
+constrained least squares `min sum a_i^T C_i a_i + 2 d_i^T a_i` s.t.
+`a_{i+1} = R_i a_i + b_i` by a sparse KKT solve; sensitivity assembled with the
+time-dilation term.  Two algebraically equivalent assemblies are computed:
+form A (`dJds_ibp`, integration by parts, identical to the authors' code) and form
+B (`dJds`, discretely consistent: per-step `xi` differences).  They agree to
+< 1e-3 at dt = 0.01 and converge together as dt -> 0 (Table 3b).
+
+Settings: sigma = 10, beta = 8/3, rho = 28, J = z, s = rho, RK4 with dt = 0.01,
+warm-up 200 t.u., 10 discarded warm-up segments, `v*(0) = 0`, `W(0)` random
+orthonormal.
+
+**A necessary implementation choice (found by the DT check failing).**  With the
+discrete neutral direction `f = (u_{n+1} - u_n)/dt` the result depended on the
+segment length (1.05 / 1.30 +/- 0.17 / 2.45 +/- 1.2 for DT = 1, 2, 4) and on dt.
+That direction is neutral for the RK4 map only to O(dt^2) per step, whereas the
+ODE right-hand side is neutral to O(dt^5); with `f = RHS` the dependence vanished
+(table below).  All NILSS results in this document use `f = RHS` (for MHW: the
+semi-discrete RHS `rhs_hw - nu k^6 (.)`, `MHWSystem.rhs`).
+
+### Table 3: Lorenz 63, d<z>/drho  (`experiments/task3_nilss_lorenz.py`)
+
+| estimate | value | settings |
+|---|---|---|
+| FD (central) | **1.0025 +/- 0.0014** | drho = 0.5, 20 independent trajectories x T = 20 000, SE over trajectories |
+| NILSS, M = 1 | **1.0135** | DT = 2, T = 20 000 (K = 10 000 segments) |
+| NILSS, M = 2 | 1.0135 | same (identical to 4 digits; the extra direction is stable) |
+| NILSS scatter | 1.0137 +/- 0.0002 (std over 10 trajectories) | M = 1, DT = 2, T = 2000 each |
+| DT = 1 / 2 / 4 | 1.0135 / 1.0136 / 1.0134 (+/- 1e-4) | M = 1, T = 4000, 4 trajectories each |
+| literature | ~1.01 | Ni & Wang 2017 (value taken from the brief; the paper could not be opened here) |
+| max \|v_perp\| | 1.9 (mean 0.65) | bounded over T = 20 000 |
+| wall time | 9 s for T = 20 000 (M = 1) | |
+
+Convergence with T (M = 1): 1.0104 (T = 50), 1.0143 (104), 1.0134 (222), 1.0134
+(472), 1.0134 (998), 1.0138 (2114), 1.0135 (4472), 1.0136 (9456), 1.0135
+(20 000).  The statistical error |NILSS(T) - NILSS(20 000)| falls faster than
+T^{-1/2} (Fig. 3, middle), from 3e-3 at T = 50 to < 1e-4 by T ~ 5000.
+
+![Task 3](results/sens/fig_task3_lorenz.png)
+
+### Table 3b: the 1 % gap is real  (`experiments/task3b_lorenz_checks.py`)
+
+| check | result |
+|---|---|
+| FD, drho = 0.25 / 0.5 / 1.0 / 2.0 (20 x T = 20 000, dt = 0.01) | 1.0108 +/- 0.0033 / 1.0025 +/- 0.0014 / 1.0029 +/- 0.0010 / 1.0016 +/- 0.0005 |
+| FD on the dt = 0.0025 map (drho = 0.5, 10 x T = 20 000) | 1.0009 +/- 0.0027 |
+| NILSS, dt = 0.02 / 0.01 / 0.005 / 0.0025 (form B; T = 4000, DT = 2) | 1.0086 / 1.0138 / 1.0156 / 1.0164 |
+| NILSS, same, form A | 1.0132 / 1.0158 / 1.0162 / 1.0166 |
+
+**Acceptance: partly met.**  NILSS is insensitive to M >= 1, to DT over a factor
+4, converges with T, and lies within 0.4 % of the literature value 1.01.  It does
+*not* lie within my FD error bar: NILSS -> 1.016 as dt -> 0 while FD is
+1.002-1.003 +/- 0.001 for every drho, a 1.1-1.4 % gap that is ~8 sigma of the FD
+error and is robust to M, DT, T, dt and assembly form.  The published
+comparisons had FD error bars of a few percent and could not see this.  I
+believe it is the known limitation of shadowing estimators (they omit the
+"unstable contribution" of Ruelle's linear response, which need not vanish for a
+system that is not uniformly hyperbolic, cf. Chandramoorthy & Wang 2021, Ni 2020);
+I have not proven that here.  See "What I'm not sure about".
+
+---
+
+## 4. NILSS on MHW at low resolution  (`experiments/task4_nilss_mhw.py`)
+
+### 4.1 Regime choice
+
+No archive regime has N_+ <= ~20 at any resolution I can afford (Table 2d): at
+64^2 all 40 computed exponents are positive; at 32^2 in the archive box the flow
+is either unresolved (nu = 1e-3) or has > 100 positive exponents (nu = 0.1), and
+alpha = 0.8 with nu = 0.03 has >= 40.  The number of positive exponents is set by
+how many large-scale modes the 64 x 64 box admits, so the proposal is to keep the
+archive physics and shrink the box:
+
+**Task 4 regime: 32^2, box 16 x 16 (dx = 0.5), alpha = 0.2, kappa = 1, nu = 1e-3
+k^6, dt = 0.0025, fixed bracket, modified HW.**  N_+ = 22 (M = 40 spectrum,
+T = 100; the exponents near zero have batched SE ~0.01 so N_+ = 22 +/- 3),
+lambda_1 = 0.112 +/- 0.018 (Lyapunov time ~9 t.u.), lambda_2..lambda_5 =
+0.095, 0.068, 0.083, 0.083, ten exponents within +/- 0.02 of zero, fully resolved
+(2e-7 of the density variance above 0.75 k_max), Gamma = 0.22 +/- 0.06 and
+E = 3.3 over t in [200, 300], gamma_max = 0.145.  A more dissipative variant
+(nu = 1e-2, same box) is not chaotic (N_+ = 2, lambda_1 = -0.005 +/- 0.002,
+D_KY = 2.3), so there is no gapped chaotic regime between these two at this box.
+
+Settings from the brief: M = N_+ + 5 = 27; DT = 5 t.u. = 0.56 Lyapunov times
+(2000 steps); K = 300 segments, T = 1500 t.u. (~170 Lyapunov times); 5 discarded
+warm-up segments; neutral direction f = semi-discrete RHS; QoI Gamma; alpha the
+parameter; seed 0 spun up 300 t.u.  T was limited by cost: at 12 ms per step
+(28 tangents) T = 1500 is 2.4 h per run and three runs were needed.  For
+Gamma_T itself to converge to 1 % one would need T >~ tau_c (sigma/0.01 Gamma)^2
+= 17 x 2400 ~ 4e4 t.u. with the measured sigma_Gamma = 0.089, tau_c = 17
+(and the seed scatter below says tau_c is really much larger); T = 1500 gives
+Gamma_T to ~8 % at best.
+
+Commands (each part is a separate process; `--part plot` merges):
+```
+C="--regime a0.2 --res 32 --L 16 --M 27 --DT 5 --K 300 --K-pre 5 --fd-seeds 5 --fd-T 4000 --dalpha 0.05 --tag _L16"
+python experiments/task4_nilss_mhw.py $C --part main   # M = 27
+python experiments/task4_nilss_mhw.py $C --part m5     # M = 32
+python experiments/task4_nilss_mhw.py $C --part dt2    # DT = 2.5, K = 600
+python experiments/task4_nilss_mhw.py $C --part fd     # central FD, 5 seeds x 4000 t.u.
+python experiments/task4_nilss_mhw.py $C --part plot
+python experiments/task4_nilss_mhw.py ${C/--dalpha 0.05 --tag _L16/--dalpha 0.02 --tag _L16_da0.02} --part fd
+```
+
+### Table 4: d<Gamma>/dalpha, 32^2, box 16, alpha = 0.2
+
+| estimate | value | settings / notes |
+|---|---|---|
+| **NILSS, M = 27, DT = 5, T = 1500** | **-0.457** | <Gamma> = 0.178; perp term -0.447, dilation term -0.011; wall 8471 s (5 processes on 4 cores), max RSS 0.81 GB |
+| (b) NILSS, M = 32 (M + 5) | -0.556 | +22 % vs M = 27; wall 9889 s, 0.89 GB |
+| (c) NILSS, DT = 2.5, K = 600 | -0.294 | -36 % vs DT = 5; wall 8484 s |
+| (d) convergence with T (M = 27, prefix solves) | -0.36 (T = 25), -0.58 (55), -0.24 (110), -0.14 (215), -0.10 (510), -0.02 (630), +0.06 (970), -0.10 (1205), **-0.46 (1500)** | wanders over [-0.6, +0.1]; spread of the last-half prefix estimates 0.22 |
+| (a) \|\|v_perp(t)\|\| | mean 5.0e3, max 1.7e4; by tenths of T: 5.8e3, 8.3e3, 6.8e3, 6.6e3, 7.6e3, 3.7e3, 3.4e3, 2.3e3, 1.9e3, 3.2e3 | state norm \|\|u\|\| = 64; per-segment \|\|v*_perp\|\| ~ 200; max \|a_i\| = 9.8e3, max \|xi_i\| = 156 |
+| **FD, dalpha = 0.05** | **-2.50 +/- 0.35** | 5 seeds x 4000 t.u.: -2.30, -1.49, -2.75, -3.65, -2.31; Gamma(0.25) = 0.05-0.14, Gamma(0.15) = 0.29-0.42 |
+| FD, dalpha = 0.02 | -1.46 +/- 0.35 | 5 seeds x 4000 t.u.: -1.05, -2.28, -1.56, -2.08, -0.34 |
+| FD noise estimate | 0.12 per seed at dalpha = 0.05 from sigma_Gamma sqrt(tau_c/T)/dalpha; **observed seed std 0.79** | the 1-t.u.-sampled autocorrelation time (17) badly under-estimates the true correlation time |
+| NILSS - FD | +2.04 = **82 % low, 5.8 sigma** (vs dalpha = 0.05); 69 % low, 2.8 sigma (vs dalpha = 0.02) | |
+| cost per Lyapunov time (9 t.u.) | 43 s wall single-process (12 ms/step x 3600 steps), 0.8 GB, for 28 tangents at 32^2 | scales ~linearly in M and ~4x per resolution doubling (Section 0.3) |
+
+![Task 4](results/sens/fig_task4_a0.2_res32_L16.png)
+
+### 4.2 Verdict: the checks fail
+
+* (a) the shadowing tangent norm does not grow exponentially over 170 Lyapunov
+  times (it fluctuates by 4x around 5e3), but it is 30-100x the state norm, so
+  \|\|v_perp\|\| dalpha exceeds \|\|u\|\| already at dalpha ~ 0.01: the linear
+  response is enormous.  I count this as a marginal pass at best.
+* (b) M -> M + 5 changes the result by 22 %.  This is inside the estimate's own
+  wandering (0.22) only because that wandering is 50 % of the value.
+* (c) DT -> DT/2 changes the result by 36 %.  **Fail.**  It is not the neutral
+  direction: on the same trajectory and tangent seeds, T = 200, the RHS,
+  forward-difference and central-difference (via the inverse map, 300x more
+  neutral per step) projections give -0.158, -0.154, -0.158 with identical
+  \|\|v_perp\|\| and \|a\| (`experiments/task4_neutral_direction_test.py`).
+* (d) No convergence with T over 1500 t.u.  **Fail.**
+* NILSS is 3-5x smaller than FD, outside every error bar.  **Fail.**  The FD
+  itself is unreliable at the 25 % level and its two dalpha values differ by
+  2 sigma; the exponential-like dependence of Gamma on alpha (2.6x over
+  dalpha = 0.1) adds a ~4 % curvature bias at dalpha = 0.05.
+
+Diagnosis, as far as I can support it: the L = 16 spectrum has ~10 exponents
+within +/- 0.02 of zero on either side of the unstable/stable boundary.  The
+shadowing direction's component along a covariant direction with exponent
+lambda_j scales like \|\|df/ds\|\|/\|lambda_j\|, so the response is dominated by
+modes with time scales of 50-500 t.u.; that is why \|\|v_perp\|\| is 5e3, why
+the least-squares coefficients are 1e4 (huge cancellation between W a and v*),
+why the QR-tracked M-dimensional subspace needs ~1/(lambda_M - lambda_{M+1})
+~ 300 t.u. to settle (so DT and M still matter), and why neither NILSS nor FD
+converges in 1500-4000 t.u.  A regime with a spectral gap at zero would fix
+this, but the only cheaper regime I found (nu = 1e-2) is not chaotic at all.
+Per the brief, Task 4 stops here.
+
+---
+
+## Resume numbers
+
+| quantity | alpha = 0.2 | alpha = 0.8 | setting |
+|---|---|---|---|
+| lambda_1, Benettin | 0.312 +/- 0.008 | 0.140 +/- 0.005 (seed 0, T = 100); **0.108 +/- 0.009** (5 seeds, T = 700) | 64^2, nu = 1e-3 k^6, dt = 0.0025, box 64, fixed bracket |
+| lambda_1, AD-growth slope (log T\|dGamma_T/dalpha\|) | 0.313 +/- 0.003 | 0.101 +/- 0.010 | same, 5 seeds, T in [24, 160] / [92, 357] |
+| lambda_1, tangent-norm slope (log\|\|v\|\|) | 0.312 +/- 0.004 | 0.100 +/- 0.009 | same |
+| lambda_1 / gamma_max | 2.10 | 1.20 (0.93 with the 5-seed lambda_1) | gamma_max = 0.1485 / 0.1158 from the HW dispersion relation with -nu k^6 on the 64^2 grid |
+| N_+ and resolution | >= 40 at 64^2 (all 40 computed exponents positive, lambda_40 = 0.256); > 100 at 32^2 box 64 even with nu = 0.1; **22 at 32^2 in a 16 x 16 box** | >= 40 at 64^2 (lambda_40 = 0.097) | see Table 2d |
+| T at which direct AD exceeds FD by 10^3 | **T = 40** (12.6 Lyapunov times) | **T = 143** (16.4 Lyapunov times at 0.140 / 15 at 0.108) | 64^2, 5 seeds |
+| NILSS vs FD relative agreement | **-0.457 vs FD -2.50 +/- 0.35 (dalpha 0.05) / -1.46 +/- 0.35 (dalpha 0.02): 82 % / 69 % low, all four checks fail** (Section 4) | -- | 32^2, box 16, alpha = 0.2, nu = 1e-3 |
+| M used | 27 and 32 (N_+ = 22) | -- | |
+| total T (NILSS) | 1500 t.u. (segment 5 t.u., K = 300; also DT = 2.5, K = 600); FD: 5 seeds x 4000 t.u. per alpha | -- | |
+| Lorenz 63, d<z>/drho | NILSS 1.0135 (dt = 0.01) -> 1.016 (dt -> 0); FD 1.0025 +/- 0.0014; literature ~1.01 | | |
+
+---
+
+## What I'm not sure about
+
+1. **The 1.1-1.4 % NILSS-FD gap on Lorenz 63.**  It is robust to M, DT, T, dt
+   and to the two assembly forms, and the FD is robust to drho over 0.25-2 and
+   to dt.  My best explanation is the missing "unstable contribution" of the
+   linear response that shadowing methods drop, but I have not computed that term
+   and could not read the original paper's error bars (network blocked).  If the
+   published FD reference has a +/- 0.01 error bar, the disagreement is
+   invisible there; it is visible here only because the FD was pushed to 0.1 %.
+2. **Whether the L = 64 MHW box has a well-defined long-time average at all on
+   affordable time scales.**  At alpha = 0.8 (64^2) five seeds sit in states
+   with fluxes differing by 2x and finite-time lambda_1 differing by 50 % over
+   700 t.u.; the flux autocorrelation time is 40-55 t.u.  At L = 16 (Task 4)
+   the seed-to-seed spread of a 4000-t.u. mean flux at alpha = 0.25 is 0.05-0.14.
+   Every FD number in this document therefore has a 15-50 % error bar, and the
+   "FD noise <= 10 %" criterion of Task 1 could not be met with any dalpha.
+   NILSS may well be *more* precise than the FD it is being validated against.
+3. **N_+ at the archive resolution.**  It is only bounded below (>= 40 at 64^2,
+   > 100 at 32^2 with 100x viscosity); the flat spectra suggest hundreds.
+   lambda_1 itself is not resolution-converged (0.31 -> 0.21 from 64^2 to 128^2
+   at alpha = 0.2; 0.14 -> 0.03 at alpha = 0.8).  Any NILSS at the archive box
+   needs M in the hundreds, i.e. hundreds of tangent solves per step.
+4. **The dt/2 check at alpha = 0.2 (5.4 %).**  The two runs follow different
+   trajectories after a few Lyapunov times and T = 100 = 31 Lyapunov times is
+   short; with the batched SE the difference is 1.5 sigma.  I have not run the
+   longer check that would settle whether it is a discretisation effect.
+5. **The neutral direction in NILSS for a split-step map.**  For the MHW
+   stepper (RK4 then exact damping factor) neither the RHS nor the discrete
+   difference is exactly neutral (relative per-step defect 4-6e-6; a central
+   difference through the inverse map gets 2e-8).  On Lorenz the choice mattered
+   decisively; on MHW at L = 16 the three choices give the same NILSS answer to
+   3 % on the same trajectory, so it is not what breaks Task 4.  I did not repeat
+   the Lorenz-style dt-refinement study on MHW.
+6. **The flux's strong nonlinearity in alpha at L = 16** (Gamma drops ~2.6x
+   between alpha = 0.15 and 0.25).  Central FD at dalpha = 0.05 then carries a
+   ~4 % curvature bias (for an exponential dependence); the dalpha = 0.02 set is
+   reported to bound this, but its noise is 2.5x larger.
+7. **How much of the archived project survives.**  With the bracket fixed the
+   64^2 fluxes are 2.2 (alpha = 0.2) and 0.45 (alpha = 0.8) instead of the
+   archived 0.028 / 0.017 at 256^2, and dGamma/dalpha is negative at alpha = 0.2
+   (about -2) instead of +0.086.  The 256^2 production protocol was not re-run
+   here (2 h per run); whether the archive's qualitative conclusions hold for the
+   correct operator is open.

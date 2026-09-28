@@ -72,6 +72,23 @@ python mhw_jax.py --res 256 --dt 0.0025 --nframes 1000 --nts 400 --solver rk4 --
 The original SLURM scripts were not present in the local archive, so exact
 `sbatch` commands and array-index seed mapping are not recoverable.
 
+## 2026-09 update: sensitivity study, and a bug in the archived bracket
+
+See **[`results.md`](results.md)** for the full study (direct-AD divergence at
+rate lambda_1, Lyapunov spectra, NILSS on Lorenz 63 and on MHW) and the
+"What I'm not sure about" section.  Two things every reader of the archive needs
+to know:
+
+1. **The archived Arakawa bracket was wrong.**  The `J^{x+}` term in `arakawa`
+   had two sign errors; the operator was exactly conservative but not a
+   consistent Jacobian (relative error 0.64 at 64^2, 2.5 at 256^2 against an
+   analytic test).  All archived flux and sensitivity numbers (Stage 1 FD,
+   Stage 1/2 direct AD, the ensemble study) were produced with it.  The fix is in
+   `mhw_jax_stage2_ad.arakawa` (archived operator kept as `arakawa_archived`);
+   `mhw_jax.py` is unchanged so the historical logs stay reproducible.
+2. New code lives in `sens/` (tangents via `jax.jvp` of `step_rk4`, Benettin/QR
+   Lyapunov spectrum, NILSS) and `experiments/` (one script per figure).
+
 ## Experimental Record
 
 ### Long finite-difference production simulations
