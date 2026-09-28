@@ -142,6 +142,7 @@ class MHWSystem:
     # -- state cache ---------------------------------------------------------
     def tag(self):
         extra = ("" if self.arakawa else "_centered") + ("" if self.modified else "_unmod")
+        extra += "" if self.L == 64.0 else f"_L{self.L:g}"
         return (f"res{self.res}_a{self.alpha:g}_k{self.kappa:g}_nu{self.nu:g}"
                 f"_op{self.diffop}_dt{self.dt:g}{extra}")
 
