@@ -70,3 +70,10 @@ allocation configuration issue, not an AD or numerical failure.
 Least-squares shadowing, NILSS, and related methods were not implemented in
 this project. They remain plausible future approaches for chaotic long-time
 sensitivity estimation.
+
+## Archived Bracket Bug (added 2026-09)
+
+All archived numerical results were produced with an Arakawa bracket whose
+`J^{x+}` term had two sign errors (see `docs/NUMERICAL_METHODS.md` and
+`results.md` Section 0.2).  The archived finite-difference sensitivities and
+direct-AD gradients are therefore not properties of the HW/MHW equations.

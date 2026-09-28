@@ -136,7 +136,13 @@ def get_jax_params(p):
 # -----------------------------------------------------------------------------
 @jit
 def arakawa(f, g, dx, dy):
-    """Arakawa Bracket using optimized slicing."""
+    """Arakawa Bracket using optimized slicing.
+
+    WARNING (2026-09): the J^{x+} term (j3) below has two sign errors and the
+    bracket is not a consistent Jacobian approximation.  It is left unchanged
+    here ONLY so that the historical logs remain reproducible.  The corrected
+    operator is in ``mhw_jax_stage2_ad.arakawa``; see results.md.
+    """
     def pad_periodic(arr):
         return jnp.pad(arr, ((1,1), (1,1)), mode='wrap') if ENABLE_JAX else np.pad(arr, ((1,1), (1,1)), mode='wrap')
 
